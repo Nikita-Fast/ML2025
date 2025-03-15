@@ -1,5 +1,8 @@
+import os
+
 from skimage.feature import graycomatrix, graycoprops
 import numpy as np
+from PIL import Image
 
 
 if __name__ == '__main__':
@@ -60,14 +63,76 @@ if __name__ == '__main__':
     def f4_entropy(mat):
         return -1 * np.sum(mat * np.log(mat, where=mat > 0))
 
-    print(m0)
 
-    print(mean_x(m0), mean_y(m0), var_x(m0), var_y(m0))
-    print(f"{'f1_odnorodnost':.<20s}", f1_odnorodnost(m0))
-    print(f"{'f2_contrast':.<20s}", f2_contrast(m0))
-    print(f"{'f3_corr':.<20s}", f3_corr(m0))
-    print(f"{'f4_entropy':.<20s}", f4_entropy(m0))
+    def pic_to_array(path: str):
+        return np.array(Image.open(path).convert('L'))
 
-    print("----------------")
-    for p in ['contrast', "homogeneity", 'correlation', 'ASM', 'mean', 'variance', 'entropy']:
-        print(f"{p:.<20s}", graycoprops(P, p)[0,0])
+    # print(m0)
+    #
+    # print(mean_x(m0), mean_y(m0), var_x(m0), var_y(m0))
+    # print(f"{'f1_odnorodnost':.<20s}", f1_odnorodnost(m0))
+    # print(f"{'f2_contrast':.<20s}", f2_contrast(m0))
+    # print(f"{'f3_corr':.<20s}", f3_corr(m0))
+    # print(f"{'f4_entropy':.<20s}", f4_entropy(m0))
+    #
+    # print("----------------")
+    # for p in ['contrast', "homogeneity", 'correlation', 'ASM', 'mean', 'variance', 'entropy']:
+    #     print(f"{p:.<20s}", graycoprops(P, p)[0,0])
+
+    path_train0 = r'D:\Projects\pythonProject\pythonProject\ML2025\Resources\Spoof_data\Training Biometrika Live\live'
+    path_train1 = r'D:\Projects\pythonProject\pythonProject\ML2025\Resources\Spoof_data\Training Biometrika Spoof\Training Biometrika Spoof\spoof'
+    path_test0 = r'D:\Projects\pythonProject\pythonProject\ML2025\Resources\Spoof_data\Testing Biometrika Live\live'
+    path_test1 = r'D:\Projects\pythonProject\pythonProject\ML2025\Resources\Spoof_data\Testing Biometrika Spoof\Testing Biometrika Spoof\spoof'
+
+    def prepare_data(path, X):
+        for subdir, dirs, files in os.walk(path):
+            i = 0
+            print(len(files))
+            for file in files:
+                img_path = subdir + os.sep + file
+                img = pic_to_array(img_path)
+
+                P = graycomatrix(img, distances=[1], angles=[0, -np.pi / 4, -np.pi / 2, -3 * np.pi / 4], levels=256, symmetric=True)
+                m = P[:, :, 0, :]
+                s = np.sum(m, axis=(0, 1))
+                for n_angle in range(4):
+                    m_angle = m[..., n_angle] / s[n_angle]
+
+                    offset = n_angle * 4
+                    X[i][offset + 0] = f1_odnorodnost(m_angle)
+                    X[i][offset + 1] = f2_contrast(m_angle)
+                    X[i][offset + 2] = f3_corr(m_angle)
+                    X[i][offset + 3] = f4_entropy(m_angle)
+
+                i += 1
+                print(i)
+
+
+    X_train0 = np.zeros((200, 16), dtype=float)
+    X_train1 = np.zeros((207, 16), dtype=float)
+    X_test0 = np.zeros((200, 16), dtype=float)
+    X_test1 = np.zeros((200, 16), dtype=float)
+
+    prepare_data(path_train0, X_train0)
+    prepare_data(path_train1, X_train1)
+    prepare_data(path_test0, X_test0)
+    prepare_data(path_test1, X_test1)
+
+    X_train = np.concatenate([X_train0, X_train1])
+    y_train = np.concatenate([np.zeros(len(X_train0), dtype=int), np.ones(len(X_train1), dtype=int)])
+
+    X_test = np.concatenate([X_test0, X_test1])
+    y_test = np.concatenate([np.zeros(len(X_test0), dtype=int), np.ones(len(X_test1), dtype=int)])
+
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVC
+    from sklearn.metrics import classification_report
+
+    clf = make_pipeline(StandardScaler(), SVC(gamma='auto'))
+    clf.fit(X_train, y_train)
+
+    y_predicted = clf.predict(X_test)
+
+    print(classification_report(y_test, y_predicted, target_names=['live', 'spoof']))
+
