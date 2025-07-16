@@ -1,5 +1,6 @@
 import os
 import time
+from tqdm import tqdm
 
 import numba
 from matplotlib import pyplot as plt
@@ -93,13 +94,13 @@ if __name__ == '__main__':
     def prepare_data(path, X):
         i = 0
         for subdir, dirs, files in os.walk(path):
-            for file in files:
+            for file in tqdm(files):
                 img_path = subdir + os.sep + file
                 img = pic_to_array(img_path)
 
                 t = time.time()
                 out = my_lbp_looped(img)
-                print(time.time() - t)
+                # print(time.time() - t)
 
                 out = np.reshape(out, -1)
 
